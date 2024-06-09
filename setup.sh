@@ -32,8 +32,8 @@ systemctl enable ssh
 systemctl start ssh
 echo "SSH has been enabled and started."
 
-# 3. Setup static IP
-echo "Setting up static IP..."
+# 3. Setup static IP and disable DHCP
+echo "Configuring static IP and disabling DHCP for $primary_interface..."
 read -p "Enter the static IP address (default: 10.37.0.27/20): " ip
 ip=${ip:-10.37.0.27/20}
 
@@ -46,16 +46,24 @@ dns1=${dns1:-10.37.0.25}
 read -p "Enter secondary DNS (default: 1.1.1.1): " dns2
 dns2=${dns2:-1.1.1.1}
 
-# Apply network configuration
+# Removing any DHCP configurations and applying static settings
+echo "Updating network settings..."
 cat > /etc/network/interfaces.d/$primary_interface <<EOF
+# This file is managed by a setup script
 auto $primary_interface
 iface $primary_interface inet static
     address $ip
+    netmask 255.255.240.0
     gateway $gateway
     dns-nameservers $dns1 $dns2
 EOF
-ifdown $primary_interface && ifup $primary_interface
-echo "Static IP configuration has been applied to $primary_interface."
+
+# Remove potential conflicting entries from /etc/network/interfaces
+sed -i "/iface $primary_interface inet dhcp/d" /etc/network/interfaces
+sed -i "/allow-hotplug $primary_interface/d" /etc/network/interfaces
+
+ifdown $primary_interface; ifup $primary_interface
+echo "Network configuration updated. DHCP disabled, static IP set."
 
 # 4. Change hostname
 echo "Changing hostname..."
